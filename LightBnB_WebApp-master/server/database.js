@@ -1,3 +1,11 @@
+const { Pool } = require('pg');
+const pool = new Pool ({
+  user: 'vagrant',
+  password: '123',
+  host: 'localhost',
+  database: 'lightbnb'
+});
+
 const properties = require('./json/properties.json');
 const users = require('./json/users.json');
 
@@ -8,17 +16,38 @@ const users = require('./json/users.json');
  * @param {String} email The email of the user.
  * @return {Promise<{}>} A promise to the user.
  */
+
+// this file sets up/creates functions w/ promises for userroutes and api routes to use to run datbases queries on. The API and User routes will do this to access data to create/redner the webpages.
+
+
 const getUserWithEmail = function(email) {
-  let user;
-  for (const userId in users) {
-    user = users[userId];
-    if (user.email.toLowerCase() === email.toLowerCase()) {
-      break;
-    } else {
-      user = null;
-    }
-  }
-  return Promise.resolve(user);
+  const queryString = `
+  SELECT *
+  FROM users
+  WHERE email = $1;
+  `;
+  const values = [email];
+
+  return pool // this is to reutnr the promise object 
+  .query(queryString, values)
+  .then(res => {
+    console.log(res.rows[0])
+    return res.rows[0]; // this will return the result of hte prmomise when this promise object is called in apiroutes.
+  })
+  .catch(err => {
+    console.log(err.message);
+  })
+
+  // let user;
+  // for (const userId in users) {
+  //   user = users[userId];
+  //   if (user.email.toLowerCase() === email.toLowerCase()) {
+  //     break;
+  //   } else {
+  //     user = null;
+  //   }
+  // }
+  // return Promise.resolve(user);
 }
 exports.getUserWithEmail = getUserWithEmail;
 
@@ -28,9 +57,25 @@ exports.getUserWithEmail = getUserWithEmail;
  * @return {Promise<{}>} A promise to the user.
  */
 const getUserWithId = function(id) {
-  return Promise.resolve(users[id]);
+  const queryString = `
+  SELECT *
+  FROM users
+  WHERE id = $1;
+  `;
+  const values = [id];
+
+  return pool // this is to reutnr the promise object 
+  .query(queryString, values)
+  .then(res => {
+    console.log(res.rows[0])
+    return res.rows[0]; // this will return the result of hte prmomise when this promise object is called in apiroutes.
+  })
+  .catch(err => {
+    console.log(err.message);
+  })
 }
 exports.getUserWithId = getUserWithId;
+
 
 
 /**
@@ -39,10 +84,18 @@ exports.getUserWithId = getUserWithId;
  * @return {Promise<{}>} A promise to the user.
  */
 const addUser =  function(user) {
-  const userId = Object.keys(users).length + 1;
-  user.id = userId;
-  users[userId] = user;
-  return Promise.resolve(user);
+  const queryString = `
+  INSERT INTO users (name, email, password) VALUES ($1, $2, $3)`;
+  const values = [user.name, user.email, user.password];
+
+  return pool
+  .query(queryString, values)
+  .then((res) => {
+    return res;
+  })
+  .catch((err) => {
+    console.error(err.message);
+  });
 }
 exports.addUser = addUser;
 
@@ -66,13 +119,25 @@ exports.getAllReservations = getAllReservations;
  * @param {*} limit The number of results to return.
  * @return {Promise<[{}]>}  A promise to the properties.
  */
-const getAllProperties = function(options, limit = 10) {
-  const limitedProperties = {};
-  for (let i = 1; i <= limit; i++) {
-    limitedProperties[i] = properties[i];
-  }
-  return Promise.resolve(limitedProperties);
-}
+
+const getAllProperties = function(options, limit = 10) { // PROMISE OBJECT IS NEEDED HERE BECUASE When getAllProperties is called in the routes file, it is chained to .then, which can only consume a promise.
+  const queryString = 
+  `SELECT *
+  FROM properties
+  LIMIT $1`;
+  const values = [limit];
+  
+  return pool // you need a return here so that this entire pool promise object is returned as a promise object to the .then /properties in the api routes. The /properties calls this function and cahins to a .then WHICH ONLY CAN TAKE A PROMISE OBJECT. So this entire promise pool object must be returned so the function call which chains to a .then in /properties can be executed.
+  .query(queryString, values) 
+  .then((res) => {
+    // console.log(res.rows);
+    return res.rows; // THIS RETURN IS NEEDED SO THAT THE PROMISE OBJECT (RETURN POOL) CARRIES WITH IT THE RESULT OF THIS QUERY PROMISE. THIS REUTRN RES.ROWS IS PIGGIED BACK AS A RESULT WITH THE RESULT POOL AND THE RESULT QUERY DATA CAN BE PASED TO /PROPERTIES .THEN CHAIN. 
+  })
+  .catch((e) => {
+    // console.log(e.message);
+    return e.message;
+  });
+};
 exports.getAllProperties = getAllProperties;
 
 
